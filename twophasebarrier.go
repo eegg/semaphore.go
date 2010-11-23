@@ -12,27 +12,29 @@ type TwoPhaseBarrier struct {
 	barrierOne semaphore.Semaphore
 	barrierTwo semaphore.Semaphore
 	end semaphore.Semaphore
-	numThreads uint32
+	numThreads int
 	funcs []func(*TwoPhaseBarrier)
 }
 
+func (this *TwoPhaseBarrier) OpenAndShut(
+	goThrough *semaphore.Semaphore,
+	stopAt *semaphore.Semaphore,
+	amt int, check int) {
 
-func (this *TwoPhaseBarrier) StartOfLoop() {
-	this.counter.IncAnd(this.numThreads, func() {
-			this.barrierTwo.P()
-			this.barrierOne.V()
+	this.counter.AddAnd(amt, check, func() {
+		stopAt.P()
+		goThrough.V()
 	})
 
-	this.barrierOne.Turnstile()
+	goThrough.Turnstile()
+}
+
+func (this *TwoPhaseBarrier) StartOfLoop() {
+	this.OpenAndShut(&this.barrierOne, &this.barrierTwo, 1, this.numThreads)
 }
 
 func (this *TwoPhaseBarrier) EndOfLoop() {
-	this.counter.DecAnd(0, func() {
-			this.barrierOne.P()
-			this.barrierTwo.V()
-	})
-
-	this.barrierTwo.Turnstile()	
+	this.OpenAndShut(&this.barrierTwo, &this.barrierOne, -1, 0)
 }
 
 func (this *TwoPhaseBarrier) End() {
@@ -44,10 +46,10 @@ func (this *TwoPhaseBarrier) End() {
 
 func NewTwoPhaseBarrier (funcs []func(*TwoPhaseBarrier)) *TwoPhaseBarrier {
 	return &TwoPhaseBarrier {
-	counter: counter.Counter { Mutex: 1 },
-	endCounter: counter.Counter { Mutex: 1 },
+	counter: counter.NewCounter(),
+	endCounter: counter.NewCounter(),
 	barrierTwo: semaphore.Semaphore(1),
-	numThreads: uint32(len(funcs)),
+	numThreads: len(funcs),
 	funcs: funcs,
 	}
 }
