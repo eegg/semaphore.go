@@ -1,40 +1,45 @@
 package main
 
 import (
-	"./twophasebarrier"
+	"./changingroom"
 	"time"
+	"rand"
 	"fmt"
 )
 
+func randSleep(max int64) {
+	time.Sleep(rand.Int63n(max))
+}
 
 func main() {
-	rvs := twophasebarrier.NewTwoPhaseBarrier([]func(bar *twophasebarrier.TwoPhaseBarrier) {
+	room := changingroom.NewChangingRoom()
 
-		func(bar *twophasebarrier.TwoPhaseBarrier) {
-			for i := 0; i < 10; i++ {
-				bar.StartOfLoop()
-				fmt.Printf("One started loop %d\n", i)
-				time.Sleep(0.5e9)
-				fmt.Printf("One ended loop %d\n", i)
-				bar.EndOfLoop()
-			}
-			bar.End()
-		},
+	go func() {
+		for i := 0; i < 100; i++ {
+			randSleep(1e9)
+			go func(i int) {
+				room.WomanIn()
+				fmt.Printf("Woman %d in room [Status: %v].\n", i, room)
+				randSleep(1e10)
+				fmt.Printf("Woman %d out of room [Status: %v].\n", i, room)
+				room.WomanOut()
+			}(i)
+		}
+	}()
 
-		func(bar *twophasebarrier.TwoPhaseBarrier) {
-			for i := 0; i < 10; i++ {
-				bar.StartOfLoop()
-				fmt.Printf("Two started loop %d\n", i)
-				time.Sleep(1e9)
-				fmt.Printf("Two ended loop %d\n", i)
-				bar.EndOfLoop()
-			}
-			bar.End()
-		},
+	go func() {
+		for i := 0; i < 100; i++ {
+			randSleep(1e9)
+			go func(i int) {
+				room.ManIn()
+				fmt.Printf("Man %d in room [Status: %v].\n", i, room)
+				randSleep(1e10)
+				fmt.Printf("Man %d out of room [Status: %v].\n", i, room)
+			}(i)
+		}
+	}()
 
-	})
-
-	rvs.Run().P()
+	time.Sleep(1e12)
 
 	fmt.Println("Done.")
 }
